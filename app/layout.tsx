@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "金吾堂まるわかり検定",
+  title: "金吾堂製菓まるわかり検定",
   description:
     "ビジョン・社名の由来・製品特徴を4択クイズで楽しく学べる、株式会社金吾堂製菓の学習アプリ",
 };

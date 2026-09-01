@@ -122,8 +122,9 @@ h1.title {
 .tagline {
   color: var(--ink-soft);
   font-size: 15px;
-  max-width: 34ch;
+  max-width: 46em;
   margin: 0;
+  text-wrap: balance;
 }
 .tagline b {
   color: var(--ink);

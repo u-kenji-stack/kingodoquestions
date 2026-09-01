@@ -154,7 +154,7 @@ export default function QuizApp() {
           <Image src="/logo.svg" alt="" width={243} height={56} priority />
         </div>
         <div className="eyebrow">株式会社金吾堂製菓</div>
-        <h1 className="title display">金吾堂まるわかり検定</h1>
+        <h1 className="title display">金吾堂製菓まるわかり検定</h1>
         <p className="tagline">
           ビジョン「<b>みんなをまるく。世界をまるく。</b>」や社名の由来、おせんべいづくりのこだわりを選択式クイズで体感しよう。
         </p>
