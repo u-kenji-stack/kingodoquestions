@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import {
   CATEGORIES,
   QUESTIONS,
@@ -150,7 +151,7 @@ export default function QuizApp() {
     <div className="app">
       <header className="masthead">
         <div className="emblem" aria-hidden="true">
-          金
+          <Image src="/logo.svg" alt="" width={243} height={56} priority />
         </div>
         <div className="eyebrow">株式会社金吾堂製菓</div>
         <h1 className="title display">金吾堂まるわかり検定</h1>
