@@ -500,6 +500,57 @@ h1.title {
   margin-top: 6px;
 }
 
+/* ---------- name entry ---------- */
+.name-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.name-form label {
+  font-family: var(--font-display-stack);
+  font-weight: 700;
+  font-size: 15px;
+}
+.name-input {
+  width: 100%;
+  font: inherit;
+  font-size: 16px;
+  color: var(--ink);
+  background: var(--surface-alt);
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  padding: 13px 20px;
+}
+.name-input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  box-shadow: var(--ring);
+}
+.name-form .btn {
+  align-self: flex-end;
+}
+.name-form .btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}
+.welcome-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.welcome-row .change-name {
+  font: inherit;
+  color: var(--accent-strong);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
 footer.hint {
   text-align: center;
   margin-top: 26px;

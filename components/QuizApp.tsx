@@ -9,14 +9,47 @@ import {
   type Question,
 } from "@/lib/questions";
 
-type Screen = "select" | "quiz" | "result";
+type Screen = "name" | "select" | "quiz" | "result";
 type CatSelection = string | "mix";
 type PerCat = Record<string, { correct: number; total: number }>;
 type BestScores = Record<string, { score: number; total: number }>;
 
 const BEST_KEY = "kingodo-quiz-best";
+const NAME_KEY = "kingodo-quiz-name";
 const GAUGE_R = 64;
 const CIRCUMFERENCE = 2 * Math.PI * GAUGE_R;
+
+function loadName(): string {
+  try {
+    return window.localStorage.getItem(NAME_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function persistName(n: string) {
+  try {
+    window.localStorage.setItem(NAME_KEY, n);
+  } catch {
+    /* storage unavailable: silently skip */
+  }
+}
+
+function submitResult(payload: {
+  name: string;
+  category: string;
+  categoryName: string;
+  score: number;
+  total: number;
+}) {
+  fetch("/api/submit-result", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).catch(() => {
+    /* best-effort logging: ignore network/server errors */
+  });
+}
 
 const TIERS = [
   { min: 0.9, tier: "殿堂入り！せんべい博士", desc: "金吾堂のことなら何でも語れるレベルです。" },
@@ -56,8 +89,10 @@ const CAT_MAP: Record<string, (typeof CATEGORIES)[number]> = Object.fromEntries(
 );
 
 export default function QuizApp() {
-  const [screen, setScreen] = useState<Screen>("select");
+  const [screen, setScreen] = useState<Screen>("name");
   const [best, setBest] = useState<BestScores>({});
+  const [name, setName] = useState("");
+  const [nameInput, setNameInput] = useState("");
   const [catId, setCatId] = useState<CatSelection | null>(null);
   const [order, setOrder] = useState<Question[]>([]);
   const [idx, setIdx] = useState(0);
@@ -69,7 +104,26 @@ export default function QuizApp() {
 
   useEffect(() => {
     setBest(loadBest());
+    const saved = loadName();
+    if (saved) {
+      setName(saved);
+      setScreen("select");
+    }
   }, []);
+
+  function confirmName(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = nameInput.trim();
+    if (!trimmed) return;
+    setName(trimmed);
+    persistName(trimmed);
+    setScreen("select");
+  }
+
+  function changeName() {
+    setNameInput(name);
+    setScreen("name");
+  }
 
   const currentQ = order[idx];
   const total = order.length;
@@ -129,6 +183,8 @@ export default function QuizApp() {
         }
         return prev;
       });
+      const categoryName = catId === "mix" ? "まるごとミックス" : CAT_MAP[catId]?.name ?? catId;
+      submitResult({ name, category: catId, categoryName, score, total });
     }
     setScreen("result");
   }
@@ -158,7 +214,38 @@ export default function QuizApp() {
         <p className="tagline">
           ビジョン「<b>みんなをまるく。世界をまるく。</b>」や社名の由来、おせんべいづくりのこだわりを選択式クイズで体感しよう。
         </p>
+        {screen !== "name" && name && (
+          <div className="welcome-row">
+            <span>ようこそ、{name}さん</span>
+            <button type="button" className="change-name" onClick={changeName}>
+              (変更)
+            </button>
+          </div>
+        )}
       </header>
+
+      {screen === "name" && (
+        <section>
+          <div className="card">
+            <form className="name-form" onSubmit={confirmName}>
+              <label htmlFor="player-name">お名前（またはニックネーム）を入力してください</label>
+              <input
+                id="player-name"
+                className="name-input"
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                placeholder="例：山田太郎"
+                autoFocus
+                maxLength={40}
+              />
+              <button type="submit" className="btn" disabled={!nameInput.trim()}>
+                はじめる →
+              </button>
+            </form>
+          </div>
+        </section>
+      )}
 
       {screen === "select" && (
         <section>
