@@ -228,7 +228,7 @@ export default function QuizApp() {
         <section>
           <div className="card">
             <form className="name-form" onSubmit={confirmName}>
-              <label htmlFor="player-name">お名前（またはニックネーム）を入力してください</label>
+              <label htmlFor="player-name">お名前を入力してください</label>
               <input
                 id="player-name"
                 className="name-input"
