@@ -4,14 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   CATEGORIES,
-  QUESTIONS,
   QUESTIONS_BY_CATEGORY,
   type Question,
 } from "@/lib/questions";
 
 type Screen = "name" | "select" | "quiz" | "result";
-type CatSelection = string | "mix";
-type PerCat = Record<string, { correct: number; total: number }>;
 type BestScores = Record<string, { score: number; total: number }>;
 
 const BEST_KEY = "kingodo-quiz-best";
@@ -93,12 +90,11 @@ export default function QuizApp() {
   const [best, setBest] = useState<BestScores>({});
   const [name, setName] = useState("");
   const [nameInput, setNameInput] = useState("");
-  const [catId, setCatId] = useState<CatSelection | null>(null);
+  const [catId, setCatId] = useState<string | null>(null);
   const [order, setOrder] = useState<Question[]>([]);
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
-  const [perCat, setPerCat] = useState<PerCat>({});
   const [gaugeOffset, setGaugeOffset] = useState(CIRCUMFERENCE);
   const nextBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -128,20 +124,14 @@ export default function QuizApp() {
   const currentQ = order[idx];
   const total = order.length;
 
-  function startQuiz(id: CatSelection) {
-    const pool = id === "mix" ? QUESTIONS : QUESTIONS_BY_CATEGORY[id] ?? [];
+  function startQuiz(id: string) {
+    const pool = QUESTIONS_BY_CATEGORY[id] ?? [];
     const shuffled = shuffle(pool);
-    const initialPerCat: PerCat = {};
-    shuffled.forEach((q) => {
-      if (!initialPerCat[q.cat]) initialPerCat[q.cat] = { correct: 0, total: 0 };
-      initialPerCat[q.cat].total++;
-    });
     setCatId(id);
     setOrder(shuffled);
     setIdx(0);
     setScore(0);
     setSelected(null);
-    setPerCat(initialPerCat);
     setGaugeOffset(CIRCUMFERENCE);
     setScreen("quiz");
   }
@@ -149,16 +139,8 @@ export default function QuizApp() {
   function selectAnswer(i: number) {
     if (selected !== null || !currentQ) return;
     setSelected(i);
-    const isCorrect = i === currentQ.correct;
-    if (isCorrect) {
+    if (i === currentQ.correct) {
       setScore((s) => s + 1);
-      setPerCat((prev) => ({
-        ...prev,
-        [currentQ.cat]: {
-          ...prev[currentQ.cat],
-          correct: prev[currentQ.cat].correct + 1,
-        },
-      }));
     }
     requestAnimationFrame(() => nextBtnRef.current?.focus());
   }
@@ -183,7 +165,7 @@ export default function QuizApp() {
         }
         return prev;
       });
-      const categoryName = catId === "mix" ? "まるごとミックス" : CAT_MAP[catId]?.name ?? catId;
+      const categoryName = CAT_MAP[catId]?.name ?? catId;
       submitResult({ name, category: catId, categoryName, score, total });
     }
     setScreen("result");
@@ -278,31 +260,9 @@ export default function QuizApp() {
                   </button>
                 );
               })}
-
-              <button
-                type="button"
-                className="cat-card mix"
-                onClick={() => startQuiz("mix")}
-              >
-                <div className="cat-badge" aria-hidden="true">
-                  全
-                </div>
-                <div>
-                  <div className="cat-name">まるごとミックス</div>
-                  <div className="cat-desc">全カテゴリからランダムに出題</div>
-                  <div className="cat-meta">
-                    <span>全{QUESTIONS.length}問</span>
-                    {best.mix && (
-                      <span className="best-tag">
-                        自己ベスト {best.mix.score}/{best.mix.total}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
             </div>
           </div>
-          <footer className="hint">全{QUESTIONS.length}問 &middot; 4択形式 &middot; 制限時間なし</footer>
+          <footer className="hint">各カテゴリー全10問 &middot; 4択形式 &middot; 制限時間なし</footer>
         </section>
       )}
 
@@ -376,9 +336,7 @@ export default function QuizApp() {
         <section>
           <div className="card">
             <div className="result-head">
-              <span className="eyebrow">
-                {catId === "mix" ? "まるごとミックス" : CAT_MAP[catId ?? ""]?.name}
-              </span>
+              <span className="eyebrow">{CAT_MAP[catId ?? ""]?.name}</span>
               <div className="gauge">
                 <svg width="150" height="150" viewBox="0 0 150 150">
                   <circle cx="75" cy="75" r={GAUGE_R} fill="none" stroke="var(--surface-alt)" strokeWidth="14" />
@@ -405,27 +363,6 @@ export default function QuizApp() {
               <p className="tier display">{tier.tier}</p>
               <p className="tier-desc">{tier.desc}</p>
             </div>
-
-            {catId === "mix" && (
-              <div className="breakdown">
-                {CATEGORIES.map((c) => {
-                  const pc = perCat[c.id];
-                  if (!pc) return null;
-                  const rpct = pc.total ? (pc.correct / pc.total) * 100 : 0;
-                  return (
-                    <div className="bd-row" key={c.id}>
-                      <span className="bd-label">{c.name}</span>
-                      <span className="bd-bar">
-                        <span className="bd-fill" style={{ width: `${rpct}%` }} />
-                      </span>
-                      <span className="bd-frac">
-                        {pc.correct}/{pc.total}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
 
             <div className="result-actions">
               <button className="btn" type="button" onClick={() => catId && startQuiz(catId)}>

@@ -175,12 +175,6 @@ h1.title {
   outline: none;
   box-shadow: var(--ring);
 }
-.cat-card.mix {
-  background: linear-gradient(155deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface));
-  grid-column: 1 / -1;
-  flex-direction: row;
-  align-items: center;
-}
 .cat-badge {
   width: 44px;
   height: 44px;
@@ -453,43 +447,6 @@ h1.title {
   font-size: 14px;
   max-width: 36ch;
   margin: 0;
-}
-
-.breakdown {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 22px 0;
-}
-.bd-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-}
-.bd-label {
-  width: 118px;
-  flex-shrink: 0;
-  color: var(--ink-soft);
-}
-.bd-bar {
-  flex: 1;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--surface-alt);
-  border: 1px solid var(--border);
-  overflow: hidden;
-}
-.bd-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
-  border-radius: 999px;
-}
-.bd-frac {
-  width: 34px;
-  text-align: right;
-  color: var(--ink-faint);
-  font-variant-numeric: tabular-nums;
 }
 
 .result-actions {
