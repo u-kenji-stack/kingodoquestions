@@ -2,14 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import {
-  CATEGORIES,
-  QUESTIONS_BY_CATEGORY,
-  type Question,
-} from "@/lib/questions";
+import { CATEGORIES, QUESTIONS, type Question } from "@/lib/questions";
 
-type Screen = "name" | "select" | "quiz" | "result";
-type BestScores = Record<string, { score: number; total: number }>;
+type Screen = "name" | "start" | "quiz" | "result";
+type PerCat = Record<string, { correct: number; total: number }>;
 
 const BEST_KEY = "kingodo-quiz-best";
 const NAME_KEY = "kingodo-quiz-name";
@@ -64,16 +60,26 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function loadBest(): BestScores {
+// 選択肢の並び順をシャッフルし、正解インデックスを付け替える
+function shuffleChoices(q: Question): Question {
+  const order = shuffle(q.choices.map((_, i) => i));
+  return {
+    ...q,
+    choices: order.map((i) => q.choices[i]),
+    correct: order.indexOf(q.correct),
+  };
+}
+
+function loadBest(): { score: number; total: number } | null {
   try {
     const raw = window.localStorage.getItem(BEST_KEY);
-    return raw ? JSON.parse(raw) : {};
+    return raw ? JSON.parse(raw) : null;
   } catch {
-    return {};
+    return null;
   }
 }
 
-function persistBest(next: BestScores) {
+function persistBest(next: { score: number; total: number }) {
   try {
     window.localStorage.setItem(BEST_KEY, JSON.stringify(next));
   } catch {
@@ -87,14 +93,14 @@ const CAT_MAP: Record<string, (typeof CATEGORIES)[number]> = Object.fromEntries(
 
 export default function QuizApp() {
   const [screen, setScreen] = useState<Screen>("name");
-  const [best, setBest] = useState<BestScores>({});
+  const [best, setBest] = useState<{ score: number; total: number } | null>(null);
   const [name, setName] = useState("");
   const [nameInput, setNameInput] = useState("");
-  const [catId, setCatId] = useState<string | null>(null);
   const [order, setOrder] = useState<Question[]>([]);
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
+  const [perCat, setPerCat] = useState<PerCat>({});
   const [gaugeOffset, setGaugeOffset] = useState(CIRCUMFERENCE);
   const nextBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -103,7 +109,7 @@ export default function QuizApp() {
     const saved = loadName();
     if (saved) {
       setName(saved);
-      setScreen("select");
+      setScreen("start");
     }
   }, []);
 
@@ -113,7 +119,7 @@ export default function QuizApp() {
     if (!trimmed) return;
     setName(trimmed);
     persistName(trimmed);
-    setScreen("select");
+    setScreen("start");
   }
 
   function changeName() {
@@ -124,14 +130,18 @@ export default function QuizApp() {
   const currentQ = order[idx];
   const total = order.length;
 
-  function startQuiz(id: string) {
-    const pool = QUESTIONS_BY_CATEGORY[id] ?? [];
-    const shuffled = shuffle(pool);
-    setCatId(id);
+  function startQuiz() {
+    const shuffled = shuffle(QUESTIONS).map(shuffleChoices);
+    const initialPerCat: PerCat = {};
+    shuffled.forEach((q) => {
+      if (!initialPerCat[q.cat]) initialPerCat[q.cat] = { correct: 0, total: 0 };
+      initialPerCat[q.cat].total++;
+    });
     setOrder(shuffled);
     setIdx(0);
     setScore(0);
     setSelected(null);
+    setPerCat(initialPerCat);
     setGaugeOffset(CIRCUMFERENCE);
     setScreen("quiz");
   }
@@ -141,6 +151,13 @@ export default function QuizApp() {
     setSelected(i);
     if (i === currentQ.correct) {
       setScore((s) => s + 1);
+      setPerCat((prev) => ({
+        ...prev,
+        [currentQ.cat]: {
+          ...prev[currentQ.cat],
+          correct: prev[currentQ.cat].correct + 1,
+        },
+      }));
     }
     requestAnimationFrame(() => nextBtnRef.current?.focus());
   }
@@ -155,19 +172,12 @@ export default function QuizApp() {
   }
 
   function finishQuiz() {
-    if (catId) {
-      setBest((prev) => {
-        const p = prev[catId];
-        if (!p || score > p.score) {
-          const next = { ...prev, [catId]: { score, total } };
-          persistBest(next);
-          return next;
-        }
-        return prev;
-      });
-      const categoryName = CAT_MAP[catId]?.name ?? catId;
-      submitResult({ name, category: catId, categoryName, score, total });
+    if (!best || score > best.score) {
+      const next = { score, total };
+      setBest(next);
+      persistBest(next);
     }
+    submitResult({ name, category: "all", categoryName: "まるわかり検定", score, total });
     setScreen("result");
   }
 
@@ -198,7 +208,7 @@ export default function QuizApp() {
         </p>
         {screen !== "name" && name && (
           <div className="welcome-row">
-            <span>ようこそ、{name}さん</span>
+            <span className="player-heading display">{name}さんの挑戦</span>
             <button type="button" className="change-name" onClick={changeName}>
               (変更)
             </button>
@@ -225,44 +235,41 @@ export default function QuizApp() {
                 はじめる →
               </button>
             </form>
+            <div className="notice-box">
+              <p className="notice-title">ご回答にあたっての注意事項</p>
+              <ul>
+                <li>回答は、お一人さま1回までとさせていただきます。</li>
+                <li>1位の方にはボーナスポイント（100点）を付与します。</li>
+              </ul>
+            </div>
           </div>
         </section>
       )}
 
-      {screen === "select" && (
+      {screen === "start" && (
         <section>
           <div className="card">
-            <div className="cat-grid">
-              {CATEGORIES.map((c) => {
-                const b = best[c.id];
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className="cat-card"
-                    onClick={() => startQuiz(c.id)}
-                  >
-                    <div className="cat-badge" aria-hidden="true">
-                      {c.badge}
-                    </div>
-                    <div>
-                      <div className="cat-name">{c.name}</div>
-                      <div className="cat-desc">{c.desc}</div>
-                    </div>
-                    <div className="cat-meta">
-                      <span>全{QUESTIONS_BY_CATEGORY[c.id]?.length ?? 0}問</span>
-                      {b && (
-                        <span className="best-tag">
-                          自己ベスト {b.score}/{b.total}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            <button type="button" className="start-card" onClick={startQuiz}>
+              <div className="cat-badge" aria-hidden="true">
+                検
+              </div>
+              <div>
+                <div className="cat-name">まるわかり検定</div>
+                <div className="cat-desc">
+                  ビジョン・社名由来・製品特徴の3テーマから、全{QUESTIONS.length}問をランダム出題
+                </div>
+                <div className="cat-meta">
+                  <span>全{QUESTIONS.length}問</span>
+                  {best && (
+                    <span className="best-tag">
+                      自己ベスト {best.score}/{best.total}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </button>
           </div>
-          <footer className="hint">各カテゴリー全10問 &middot; 4択形式 &middot; 制限時間なし</footer>
+          <footer className="hint">全{QUESTIONS.length}問 &middot; 4択形式 &middot; 制限時間なし</footer>
         </section>
       )}
 
@@ -336,7 +343,7 @@ export default function QuizApp() {
         <section>
           <div className="card">
             <div className="result-head">
-              <span className="eyebrow">{CAT_MAP[catId ?? ""]?.name}</span>
+              <span className="eyebrow">まるわかり検定</span>
               <div className="gauge">
                 <svg width="150" height="150" viewBox="0 0 150 150">
                   <circle cx="75" cy="75" r={GAUGE_R} fill="none" stroke="var(--surface-alt)" strokeWidth="14" />
@@ -364,16 +371,35 @@ export default function QuizApp() {
               <p className="tier-desc">{tier.desc}</p>
             </div>
 
+            <div className="breakdown">
+              {CATEGORIES.map((c) => {
+                const pc = perCat[c.id];
+                if (!pc) return null;
+                const rpct = pc.total ? (pc.correct / pc.total) * 100 : 0;
+                return (
+                  <div className="bd-row" key={c.id}>
+                    <span className="bd-label">{c.name}</span>
+                    <span className="bd-bar">
+                      <span className="bd-fill" style={{ width: `${rpct}%` }} />
+                    </span>
+                    <span className="bd-frac">
+                      {pc.correct}/{pc.total}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
             <div className="result-actions">
-              <button className="btn" type="button" onClick={() => catId && startQuiz(catId)}>
+              <button className="btn" type="button" onClick={startQuiz}>
                 もう一度挑戦
               </button>
               <button
                 className="btn ghost"
                 type="button"
-                onClick={() => setScreen("select")}
+                onClick={() => setScreen("start")}
               >
-                カテゴリ選択に戻る
+                トップに戻る
               </button>
             </div>
           </div>
