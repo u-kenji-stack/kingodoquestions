@@ -519,6 +519,31 @@ h1.title {
   cursor: default;
   transform: none;
 }
+.field-error {
+  margin: -8px 0 0;
+  font-size: 13px;
+  color: var(--error);
+}
+.checking-text {
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 14px;
+  margin: 8px 0;
+}
+.blocked-box {
+  text-align: center;
+  padding: 8px 0;
+}
+.blocked-box .notice-title {
+  color: var(--error-ink);
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+.blocked-box p:last-child {
+  color: var(--ink-soft);
+  font-size: 14px;
+  margin: 0;
+}
 .welcome-row {
   display: flex;
   align-items: center;

@@ -44,6 +44,26 @@ function submitResult(payload: {
   });
 }
 
+async function checkAlreadyAnswered(n: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/check-name?name=${encodeURIComponent(n)}`);
+    const data = await res.json();
+    return Boolean(data.alreadyAnswered);
+  } catch {
+    // 確認できない場合は、誤ってブロックしないよう「未回答」扱いにする
+    return false;
+  }
+}
+
+// お名前欄のバリデーション。問題があれば理由を文字列で返す
+function validateName(n: string): string | null {
+  if (!n) return "お名前を入力してください。";
+  if (n.length < 2) return "お名前は2文字以上で入力してください。";
+  if (/[\s　]/.test(n)) return "お名前の間にスペースを入れないでください。";
+  if (!/[\p{L}\p{M}]/u.test(n)) return "正しいお名前を入力してください。";
+  return null;
+}
+
 const TIERS = [
   { min: 0.9, tier: "殿堂入り！せんべい博士", desc: "金吾堂のことなら何でも語れるレベルです。" },
   { min: 0.7, tier: "なかなかやるね！", desc: "ビジョンやこだわりがしっかり身についています。" },
@@ -96,6 +116,9 @@ export default function QuizApp() {
   const [best, setBest] = useState<{ score: number; total: number } | null>(null);
   const [name, setName] = useState("");
   const [nameInput, setNameInput] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const [order, setOrder] = useState<Question[]>([]);
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState(0);
@@ -110,20 +133,35 @@ export default function QuizApp() {
     if (saved) {
       setName(saved);
       setScreen("start");
+      setChecking(true);
+      checkAlreadyAnswered(saved).then((already) => {
+        setChecking(false);
+        setBlocked(already);
+      });
     }
   }, []);
 
-  function confirmName(e: React.FormEvent) {
+  async function confirmName(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = nameInput.trim();
-    if (!trimmed) return;
+    const error = validateName(trimmed);
+    if (error) {
+      setNameError(error);
+      return;
+    }
+    setNameError(null);
     setName(trimmed);
     persistName(trimmed);
     setScreen("start");
+    setChecking(true);
+    const already = await checkAlreadyAnswered(trimmed);
+    setChecking(false);
+    setBlocked(already);
   }
 
   function changeName() {
     setNameInput(name);
+    setNameError(null);
     setScreen("name");
   }
 
@@ -178,6 +216,7 @@ export default function QuizApp() {
       persistBest(next);
     }
     submitResult({ name, category: "all", categoryName: "まるわかり検定", score, total });
+    setBlocked(true);
     setScreen("result");
   }
 
@@ -226,13 +265,17 @@ export default function QuizApp() {
                 className="name-input"
                 type="text"
                 value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
+                onChange={(e) => {
+                  setNameInput(e.target.value);
+                  setNameError(null);
+                }}
                 placeholder="例：山田太郎"
                 autoFocus
                 maxLength={40}
               />
-              <button type="submit" className="btn" disabled={!nameInput.trim()}>
-                はじめる →
+              {nameError && <p className="field-error">{nameError}</p>}
+              <button type="submit" className="btn" disabled={!nameInput.trim() || checking}>
+                {checking ? "確認中…" : "はじめる →"}
               </button>
             </form>
             <div className="notice-box">
@@ -249,25 +292,36 @@ export default function QuizApp() {
       {screen === "start" && (
         <section>
           <div className="card">
-            <button type="button" className="start-card" onClick={startQuiz}>
-              <div className="cat-badge" aria-hidden="true">
-                検
+            {checking ? (
+              <p className="checking-text">回答状況を確認しています…</p>
+            ) : blocked ? (
+              <div className="blocked-box">
+                <p className="notice-title">回答済みです</p>
+                <p>
+                  {name}さんは既にご回答いただいております。回答は、お一人さま1回までとさせていただいております。
+                </p>
               </div>
-              <div>
-                <div className="cat-name">まるわかり検定</div>
-                <div className="cat-desc">
-                  ビジョン・社名由来・製品特徴の3テーマから、全{QUESTIONS.length}問をランダム出題
+            ) : (
+              <button type="button" className="start-card" onClick={startQuiz}>
+                <div className="cat-badge" aria-hidden="true">
+                  検
                 </div>
-                <div className="cat-meta">
-                  <span>全{QUESTIONS.length}問</span>
-                  {best && (
-                    <span className="best-tag">
-                      自己ベスト {best.score}/{best.total}
-                    </span>
-                  )}
+                <div>
+                  <div className="cat-name">まるわかり検定</div>
+                  <div className="cat-desc">
+                    ビジョン・社名由来・製品特徴の3テーマから、全{QUESTIONS.length}問をランダム出題
+                  </div>
+                  <div className="cat-meta">
+                    <span>全{QUESTIONS.length}問</span>
+                    {best && (
+                      <span className="best-tag">
+                        自己ベスト {best.score}/{best.total}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </button>
+              </button>
+            )}
           </div>
           <footer className="hint">全{QUESTIONS.length}問 &middot; 4択形式 &middot; 制限時間なし</footer>
         </section>
@@ -391,14 +445,7 @@ export default function QuizApp() {
             </div>
 
             <div className="result-actions">
-              <button className="btn" type="button" onClick={startQuiz}>
-                もう一度挑戦
-              </button>
-              <button
-                className="btn ghost"
-                type="button"
-                onClick={() => setScreen("start")}
-              >
+              <button className="btn" type="button" onClick={() => setScreen("start")}>
                 トップに戻る
               </button>
             </div>
